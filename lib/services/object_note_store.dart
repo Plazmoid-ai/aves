@@ -1,3 +1,5 @@
+// ignore_for_file: unnecessary_type_name_in_constructor
+
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
