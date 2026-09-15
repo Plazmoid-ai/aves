@@ -378,6 +378,8 @@ class _EntryPageViewState extends State<EntryPageView> with TickerProviderStateM
 
   Future<void> _onLongPressStart(BuildContext context, MagnifierState state, Alignment alignment, Offset childTapPosition) async {
     if (!objectNoteModeNotifier.value) return;
+    if (!context.mounted) return;
+    final navigator = Navigator.of(context, rootNavigator: true);
     final contentSize = entry.displaySize;
     if (contentSize.isEmpty) return;
     final x = (childTapPosition.dx / contentSize.width).clamp(0.0, 1.0);
@@ -393,15 +395,15 @@ class _EntryPageViewState extends State<EntryPageView> with TickerProviderStateM
           autofocus: true,
           textInputAction: TextInputAction.done,
           decoration: const InputDecoration(hintText: 'Текст заметки'),
-          onSubmitted: (_) => Navigator.of(dialogContext).pop(controller.text),
+          onSubmitted: (_) => navigator.pop(controller.text),
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(),
+            onPressed: navigator.pop,
             child: const Text('Отмена'),
           ),
           TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(controller.text),
+            onPressed: () => navigator.pop(controller.text),
             child: const Text('Сохранить'),
           ),
         ],
