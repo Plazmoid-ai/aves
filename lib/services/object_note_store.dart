@@ -71,3 +71,4 @@ final objectNoteStore = ObjectNoteStore();
 final objectNoteModeNotifier = ValueNotifier<bool>(false);
 
 // MVP build trigger: keep object-note changes in the release verification path.
+// The next check also validates the dialog context lifecycle.
