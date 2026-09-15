@@ -54,6 +54,11 @@ class ObjectNoteStore {
         .toList();
   }
 
+  Future<List<ObjectNote>> getForEntry(String entryKey) async {
+    final notes = await load();
+    return notes.where((note) => note.entryKey == entryKey).toList();
+  }
+
   Future<void> add(ObjectNote note) async {
     final notes = await load();
     notes.add(note);
@@ -62,7 +67,10 @@ class ObjectNoteStore {
 
   Future<void> _save(List<ObjectNote> notes) async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_key, jsonEncode(notes.map((note) => note.toJson()).toList()));
+    await prefs.setString(
+      _key,
+      jsonEncode(notes.map((note) => note.toJson()).toList()),
+    );
   }
 }
 
