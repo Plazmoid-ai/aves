@@ -62,9 +62,7 @@ class _EntryPageViewState extends State<EntryPageView> with TickerProviderStateM
   OverlayEntry? _actionFeedbackOverlayEntry;
 
   AvesEntry get mainEntry => widget.mainEntry;
-
   AvesEntry get entry => widget.pageEntry;
-
   ViewerController get viewerController => widget.viewerController;
 
   @override
@@ -76,7 +74,6 @@ class _EntryPageViewState extends State<EntryPageView> with TickerProviderStateM
   @override
   void didUpdateWidget(covariant EntryPageView oldWidget) {
     super.didUpdateWidget(oldWidget);
-
     if (oldWidget.pageEntry != widget.pageEntry) {
       _unregisterWidget(oldWidget);
       _registerWidget(widget);
@@ -135,21 +132,13 @@ class _EntryPageViewState extends State<EntryPageView> with TickerProviderStateM
             child = _buildRasterView();
           }
         }
-
-        child ??= ErrorView(
-          entry: entry,
-          onTap: _onTap,
-        );
+        child ??= ErrorView(entry: entry, onTap: _onTap);
         return child;
       },
     );
 
     if (!settings.viewerUseCutout) {
-      child = SafeCutoutArea(
-        child: ClipRect(
-          child: child,
-        ),
-      );
+      child = SafeCutoutArea(child: ClipRect(child: child));
     }
 
     final animate = context.select<Settings, bool>((v) => v.animate);
@@ -163,7 +152,6 @@ class _EntryPageViewState extends State<EntryPageView> with TickerProviderStateM
         child: child,
       );
     }
-
     return child;
   }
 
@@ -173,10 +161,7 @@ class _EntryPageViewState extends State<EntryPageView> with TickerProviderStateM
       child: RasterImageView(
         entry: entry,
         viewStateNotifier: _viewStateNotifier,
-        errorBuilder: (context, error, stackTrace) => ErrorView(
-          entry: entry,
-          onTap: _onTap,
-        ),
+        errorBuilder: (context, error, stackTrace) => ErrorView(entry: entry, onTap: _onTap),
       ),
     );
   }
@@ -189,10 +174,7 @@ class _EntryPageViewState extends State<EntryPageView> with TickerProviderStateM
       child: VectorImageView(
         entry: entry,
         viewStateNotifier: _viewStateNotifier,
-        errorBuilder: (context, error, stackTrace) => ErrorView(
-          entry: entry,
-          onTap: _onTap,
-        ),
+        errorBuilder: (context, error, stackTrace) => ErrorView(entry: entry, onTap: _onTap),
       ),
     );
   }
@@ -206,7 +188,6 @@ class _EntryPageViewState extends State<EntryPageView> with TickerProviderStateM
       builder: (context, sar, child) {
         final videoDisplaySize = entry.videoDisplaySize(sar);
         final isPureVideo = entry.isPureVideo;
-
         return Selector<Settings, (bool, bool, bool)>(
           selector: (context, s) => (
             isPureVideo && s.videoGestureDoubleTapTogglePlay,
@@ -216,7 +197,6 @@ class _EntryPageViewState extends State<EntryPageView> with TickerProviderStateM
           builder: (context, s, child) {
             final (playGesture, seekGesture, useVerticalDragGesture) = s;
             final useTapGesture = playGesture || seekGesture;
-
             MagnifierDoubleTapCallback? onDoubleTap;
             MagnifierGestureScaleStartCallback? onScaleStart;
             MagnifierGestureScaleUpdateCallback? onScaleUpdate;
@@ -228,18 +208,9 @@ class _EntryPageViewState extends State<EntryPageView> with TickerProviderStateM
                   icon?.call() ?? action.getIconData(),
                   size: 48,
                   color: Colors.white,
-                  shadows: const [
-                    Shadow(
-                      color: Colors.black,
-                      blurRadius: 4,
-                    ),
-                  ],
+                  shadows: const [Shadow(color: Colors.black, blurRadius: 4)],
                 );
-                VideoActionNotification(
-                  controller: videoController,
-                  entry: entry,
-                  action: action,
-                ).dispatch(context);
+                VideoActionNotification(controller: videoController, entry: entry, action: action).dispatch(context);
               }
 
               onDoubleTap = (alignment) {
@@ -257,10 +228,7 @@ class _EntryPageViewState extends State<EntryPageView> with TickerProviderStateM
                   }
                 }
                 if (playGesture) {
-                  _applyAction(
-                    EntryAction.videoTogglePlay,
-                    icon: () => videoController.isPlaying ? AIcons.pause : AIcons.play,
-                  );
+                  _applyAction(EntryAction.videoTogglePlay, icon: () => videoController.isPlaying ? AIcons.pause : AIcons.play);
                   return true;
                 }
                 return false;
@@ -277,7 +245,6 @@ class _EntryPageViewState extends State<EntryPageView> with TickerProviderStateM
               onScaleStart = (details, doubleTap, boundaries) {
                 dropped = details.pointerCount > 1 || doubleTap;
                 if (dropped) return;
-
                 startValue = null;
                 valueNotifier = ValueNotifier<double?>(null);
                 final alignmentX = details.focalPoint.dx / boundaries.viewportSize.width;
@@ -286,23 +253,16 @@ class _EntryPageViewState extends State<EntryPageView> with TickerProviderStateM
                 swipeAction = action;
                 move = Offset.zero;
                 _actionFeedbackOverlayEntry = OverlayEntry(
-                  builder: (context) => SwipeActionFeedback(
-                    action: action,
-                    valueNotifier: valueNotifier!,
-                  ),
+                  builder: (context) => SwipeActionFeedback(action: action, valueNotifier: valueNotifier!),
                 );
                 Overlay.of(context).insert(_actionFeedbackOverlayEntry!);
               };
               onScaleUpdate = (details) {
                 if (valueNotifier == null) return false;
-
                 move += details.focalPointDelta;
                 dropped |= details.pointerCount > 1;
-                if (valueNotifier!.value == null) {
-                  dropped |= MagnifierGestureRecognizer.isXPan(move);
-                }
+                if (valueNotifier!.value == null) dropped |= MagnifierGestureRecognizer.isXPan(move);
                 if (dropped) return false;
-
                 final _startValue = startValue;
                 if (_startValue != null) {
                   final double value = (_startValue - move.dy / SwipeActionFeedback.height).clamp(0, 1);
@@ -313,10 +273,7 @@ class _EntryPageViewState extends State<EntryPageView> with TickerProviderStateM
               };
               onScaleEnd = (details) {
                 valueNotifier?.dispose();
-
-                _actionFeedbackOverlayEntry
-                  ?..remove()
-                  ..dispose();
+                _actionFeedbackOverlayEntry?..remove()..dispose();
                 _actionFeedbackOverlayEntry = null;
               };
             }
@@ -329,32 +286,20 @@ class _EntryPageViewState extends State<EntryPageView> with TickerProviderStateM
                   onScaleUpdate: onScaleUpdate,
                   onScaleEnd: onScaleEnd,
                   onDoubleTap: onDoubleTap,
-                  child: VideoView(
-                    entry: entry,
-                    controller: videoController,
-                  ),
+                  child: VideoView(entry: entry, controller: videoController),
                 ),
-                VideoSubtitles(
-                  entry: entry,
-                  controller: videoController,
-                  viewStateNotifier: _viewStateNotifier,
-                ),
+                VideoSubtitles(entry: entry, controller: videoController, viewStateNotifier: _viewStateNotifier),
                 if (useTapGesture)
                   ValueListenableBuilder<Widget?>(
                     valueListenable: _actionFeedbackChildNotifier,
-                    builder: (context, feedbackChild, child) => ActionFeedback(
-                      child: feedbackChild,
-                    ),
+                    builder: (context, feedbackChild, child) => ActionFeedback(child: feedbackChild),
                   ),
               ],
             );
             if (useVerticalDragGesture) {
               final scope = MagnifierGestureDetectorScope.maybeOf(context);
               if (scope != null) {
-                videoChild = scope.copyWith(
-                  acceptPointerEvent: MagnifierGestureRecognizer.isYPan,
-                  child: videoChild,
-                );
+                videoChild = scope.copyWith(acceptPointerEvent: MagnifierGestureRecognizer.isYPan, child: videoChild);
               }
             }
             return Stack(
@@ -372,9 +317,7 @@ class _EntryPageViewState extends State<EntryPageView> with TickerProviderStateM
                     controller: coverController,
                     displaySize: coverSize,
                     onDoubleTap: onDoubleTap,
-                    child: Image(
-                      image: videoCoverUriImage,
-                    ),
+                    child: Image(image: videoCoverUriImage),
                   ),
                 ),
               ],
@@ -404,7 +347,6 @@ class _EntryPageViewState extends State<EntryPageView> with TickerProviderStateM
       valueListenable: AvesApp.canGestureToOtherApps,
       builder: (context, canGestureToOtherApps, child) {
         return AvesMagnifier(
-          // key includes modified date to refresh when the image is modified by metadata (e.g. rotated)
           key: Key('${entry.uri}_${entry.pageId}_${entry.dateModifiedMillis}'),
           controller: controller ?? _magnifierController,
           contentSize: displaySize ?? entry.displaySize,
@@ -424,6 +366,7 @@ class _EntryPageViewState extends State<EntryPageView> with TickerProviderStateM
             _onTap(alignment: alignment);
           },
           onLongPress: canGestureToOtherApps ? _startGlobalDrag : null,
+          onLongPressStart: _onLongPressStart,
           onDoubleTap: onDoubleTap,
           child: child!,
         );
@@ -432,25 +375,26 @@ class _EntryPageViewState extends State<EntryPageView> with TickerProviderStateM
     );
   }
 
+  void _onLongPressStart(BuildContext context, MagnifierState state, Alignment alignment, Offset childTapPosition) {
+    final contentSize = entry.displaySize;
+    if (contentSize.isEmpty) return;
+    final x = (childTapPosition.dx / contentSize.width).clamp(0.0, 1.0);
+    final y = (childTapPosition.dy / contentSize.height).clamp(0.0, 1.0);
+    debugPrint('[ObjectNote MVP] entry=${entry.pageId} x=$x y=$y');
+  }
+
   Future<void> _startGlobalDrag() async {
     const dragShadowSize = Size.square(128);
     final cornerRadiusPx = await deviceService.getWidgetCornerRadiusPx();
-
     final devicePixelRatio = MediaQuery.devicePixelRatioOf(context);
     final brightness = Theme.of(context).brightness;
     final outline = await WidgetOutline.systemBlackAndWhite.color(brightness);
-
-    final dragShadowBytes =
-        await HomeWidgetPainter(
-          entry: entry,
-          devicePixelRatio: devicePixelRatio,
-        ).drawWidget(
-          sizeDip: dragShadowSize,
-          cornerRadiusPx: cornerRadiusPx,
-          outline: outline,
-          shape: WidgetShape.rrect,
-        );
-
+    final dragShadowBytes = await HomeWidgetPainter(entry: entry, devicePixelRatio: devicePixelRatio).drawWidget(
+      sizeDip: dragShadowSize,
+      cornerRadiusPx: cornerRadiusPx,
+      outline: outline,
+      shape: WidgetShape.rrect,
+    );
     await windowService.startGlobalDrag(entry.uri, entry.bestTitle, dragShadowSize, dragShadowBytes);
   }
 
@@ -489,14 +433,8 @@ class _EntryPageViewState extends State<EntryPageView> with TickerProviderStateM
     return notification.dispatch(context);
   }
 
-  // side gesture handling by precedence:
-  // - seek in video by side double tap (if enabled)
-  // - go to previous/next entry by side single tap (if enabled)
-  // - zoom in/out by double tap
   bool _allowDoubleTap(Alignment alignment) {
-    if (entry.isVideo && settings.videoGestureSideDoubleTapSeek) {
-      return true;
-    }
+    if (entry.isVideo && settings.videoGestureSideDoubleTapSeek) return true;
     final actionNotification = _handleSideSingleTap(alignment);
     return actionNotification == null;
   }
@@ -504,7 +442,6 @@ class _EntryPageViewState extends State<EntryPageView> with TickerProviderStateM
   void _onMediaCommand(MediaCommandEvent event) {
     final videoController = context.read<VideoConductor>().getController(entry);
     if (videoController == null) return;
-
     switch (event.command) {
       case .play:
         videoController.play();
@@ -517,25 +454,17 @@ class _EntryPageViewState extends State<EntryPageView> with TickerProviderStateM
       case .stop:
         videoController.pause();
       case .seek:
-        if (event is MediaSeekCommandEvent) {
-          videoController.seekTo(event.position);
-        }
+        if (event is MediaSeekCommandEvent) videoController.seekTo(event.position);
     }
   }
 
   void _onViewStateChanged(MagnifierState v) {
     if (!mounted) return;
-    _viewStateNotifier.value = _viewStateNotifier.value.copyWith(
-      position: v.position,
-      scale: v.scale,
-    );
+    _viewStateNotifier.value = _viewStateNotifier.value.copyWith(position: v.position, scale: v.scale);
   }
 
   void _onViewScaleBoundariesChanged(ScaleBoundaries v) {
-    _viewStateNotifier.value = _viewStateNotifier.value.copyWith(
-      viewportSize: v.viewportSize,
-      contentSize: v.contentSize,
-    );
+    _viewStateNotifier.value = _viewStateNotifier.value.copyWith(viewportSize: v.viewportSize, contentSize: v.contentSize);
   }
 
   double? _getSideRatio() {
