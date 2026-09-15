@@ -20,6 +20,7 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -45,21 +46,30 @@ jobs:
           KEY_PASSWORD: ${{ secrets.AVES_KEY_PASSWORD }}
         run: |
           set -euo pipefail
+
           test -n "$KEYSTORE_B64"
           test -n "$STORE_PASSWORD"
           test -n "$KEY_ALIAS"
           test -n "$KEY_PASSWORD"
+
           KEYSTORE_PATH="$RUNNER_TEMP/aves-modbox-release.jks"
+
           CLEAN_B64=$(printf '%s' "$KEYSTORE_B64" | tr -d '[:space:]')
+
           echo "Base64 length: ${#CLEAN_B64}"
           echo "Base64 length mod 4: $((${#CLEAN_B64} % 4))"
+
           INVALID_COUNT=$(printf '%s' "$CLEAN_B64" | LC_ALL=C tr -d 'A-Za-z0-9+/=' | wc -c)
           echo "Invalid Base64 characters: $INVALID_COUNT"
+
           python3 - <<'PY'
           import base64
           import os
+
           s = ''.join(os.environ['KEYSTORE_B64'].split())
+
           print('Python Base64 validation: starting')
+
           try:
               decoded = base64.b64decode(s, validate=True)
               print(f'Python Base64 validation: OK, decoded bytes: {len(decoded)}')
@@ -67,8 +77,11 @@ jobs:
               print(f'Python Base64 validation: FAILED ({type(e).__name__}: {e})')
               raise
           PY
+
           printf '%s' "$CLEAN_B64" | base64 --decode > "$KEYSTORE_PATH"
+
           test -s "$KEYSTORE_PATH"
+
           {
             echo "AVES_STORE_FILE=$KEYSTORE_PATH"
             echo "AVES_STORE_PASSWORD=$STORE_PASSWORD"
@@ -78,22 +91,36 @@ jobs:
 
       - name: Build release arm64 APK
         run: |
-          ./flutterw build apk -t lib/main_libre.dart --flavor libre --split-per-abi --target-platform android-arm64
+          ./flutterw build apk \
+            -t lib/main_libre.dart \
+            --flavor libre \
+            --split-per-abi \
+            --target-platform android-arm64
 
       - name: Verify APK is signed
         run: |
-          APK=$(find build/app/outputs/apk/libre/release -name '*arm64-v8a*.apk' -type f | grep -v -- '-unsigned.apk$' | head -n1)
-          test -n "$APK"
+          APK="build/app/outputs/flutter-apk/app-arm64-v8a-libre-release.apk"
+
+          test -f "$APK"
+
+          echo "APK found:"
+          ls -lh "$APK"
+
           APKSIGNER=$(find "$ANDROID_HOME/build-tools" -name apksigner | sort -V | tail -n1)
+
           test -n "$APKSIGNER"
+
+          echo "Verifying APK signature..."
           "$APKSIGNER" verify --verbose "$APK"
+
+          echo "APK certificates:"
           "$APKSIGNER" verify --print-certs "$APK"
 
       - name: Upload signed arm64 APK
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: object-note-libre-arm64-release
-          path: build/app/outputs/flutter-apk/*arm64-v8a-release.apk
+          path: build/app/outputs/flutter-apk/app-arm64-v8a-libre-release.apk
 
       - name: Remove temporary keystore
         if: always()
