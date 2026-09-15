@@ -224,14 +224,11 @@ class _BottomOverlayContentState extends State<_BottomOverlayContent> {
           builder: (context, active, child) {
             return Padding(
               padding: const EdgeInsets.only(bottom: 4),
-              child: OverlayButton(
-                scale: _buttonScale,
-                child: IconButton(
-                  icon: Icon(Icons.note_add, color: active ? Theme.of(context).colorScheme.primary : null),
-                  tooltip: 'Добавить заметку',
-                  onPressed: () => objectNoteModeNotifier.value = !active,
-                ),
-              ),
+              child: IconButton(
+            icon: Icon(Icons.note_add, color: active ? Theme.of(context).colorScheme.primary : null),
+            tooltip: 'Добавить заметку',
+            onPressed: () => objectNoteModeNotifier.value = !active,
+          ),
             );
           },
         );
