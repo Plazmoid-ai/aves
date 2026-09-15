@@ -30,34 +30,11 @@ jobs:
           from pathlib import Path
           p = Path('lib/widgets/viewer/visual/entry_page_view.dart')
           s = p.read_text()
-          old = '''  Future<void> _onLongPressStart(BuildContext context, MagnifierState state, Alignment alignment, Offset childTapPosition) async {
-    if (!objectNoteModeNotifier.value) return;
-    final contentSize = entry.displaySize;
-    if (contentSize.isEmpty) return;
-    final x = (childTapPosition.dx / contentSize.width).clamp(0.0, 1.0);
-    final y = (childTapPosition.dy / contentSize.height).clamp(0.0, 1.0);
-
-    final controller = TextEditingController();
-'''
-          new = '''  Future<void> _onLongPressStart(BuildContext context, MagnifierState state, Alignment alignment, Offset childTapPosition) async {
-    if (!objectNoteModeNotifier.value) return;
-    if (!context.mounted) return;
-    final navigator = Navigator.of(context, rootNavigator: true);
-    final contentSize = entry.displaySize;
-    if (contentSize.isEmpty) return;
-    final x = (childTapPosition.dx / contentSize.width).clamp(0.0, 1.0);
-    final y = (childTapPosition.dy / contentSize.height).clamp(0.0, 1.0);
-
-    final controller = TextEditingController();
-'''
-          if old in s:
-              s = s.replace(old, new, 1)
-              s = s.replace('''          onSubmitted: (_) => Navigator.of(dialogContext).pop(controller.text),''', '''          onSubmitted: (_) => navigator.pop(controller.text),''', 1)
-              s = s.replace('''            onPressed: () => Navigator.of(dialogContext).pop(),''', '''            onPressed: navigator.pop,''', 1)
-              s = s.replace('''            onPressed: () => Navigator.of(dialogContext).pop(controller.text),''', '''            onPressed: () => navigator.pop(controller.text),''', 1)
-              p.write_text(s)
-          else:
-              print('Dialog context patch already present')
+          s = s.replace('if (!objectNoteModeNotifier.value) return;\n    final contentSize', 'if (!objectNoteModeNotifier.value) return;\n    if (!context.mounted) return;\n    final navigator = Navigator.of(context, rootNavigator: true);\n    final contentSize', 1)
+          s = s.replace('onSubmitted: (_) => Navigator.of(dialogContext).pop(controller.text),', 'onSubmitted: (_) => navigator.pop(controller.text),', 1)
+          s = s.replace('onPressed: () => Navigator.of(dialogContext).pop(),', 'onPressed: navigator.pop,', 1)
+          s = s.replace('onPressed: () => Navigator.of(dialogContext).pop(controller.text),', 'onPressed: () => navigator.pop(controller.text),', 1)
+          p.write_text(s)
           PY
 
       - name: Get Flutter packages
