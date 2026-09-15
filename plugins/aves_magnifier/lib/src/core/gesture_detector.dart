@@ -12,6 +12,7 @@ class const MagnifierGestureDetector({
   final GestureTapDownCallback? onTapDown,
   final GestureTapUpCallback? onTapUp,
   final GestureLongPressCallback? onLongPress,
+  final GestureLongPressStartCallback? onLongPressStart,
   final GestureTapDownCallback? onDoubleTap,
   final MagnifierDoubleTapPredicate? allowDoubleTap,
   final HitTestBehavior? behavior,
@@ -46,11 +47,13 @@ class _MagnifierGestureDetectorState extends State<MagnifierGestureDetector> {
       );
     }
 
-    if (widget.onLongPress != null) {
+    if (widget.onLongPress != null || widget.onLongPressStart != null) {
       gestures[LongPressGestureRecognizer] = GestureRecognizerFactoryWithHandlers<LongPressGestureRecognizer>(
         () => LongPressGestureRecognizer(debugOwner: this),
         (instance) {
-          instance.onLongPress = widget.onLongPress;
+          instance
+            ..onLongPress = widget.onLongPress
+            ..onLongPressStart = widget.onLongPressStart;
         },
       );
     }
