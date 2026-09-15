@@ -6,6 +6,7 @@ import 'package:aves/model/entry/extensions/multipage.dart';
 import 'package:aves/model/selection.dart';
 import 'package:aves/model/settings/settings.dart';
 import 'package:aves/model/source/collection_lens.dart';
+import 'package:aves/services/object_note_store.dart';
 import 'package:aves/widgets/common/extensions/media_query.dart';
 import 'package:aves/widgets/viewer/controls/intents.dart';
 import 'package:aves/widgets/viewer/controls/notifications.dart';
@@ -150,7 +151,6 @@ class _BottomOverlayContentState extends State<_BottomOverlayContent> {
     final animationController = widget.animationController;
     _buttonScale = CurvedAnimation(
       parent: animationController,
-      // a little bounce at the top
       curve: Curves.easeOutBack,
     );
     _thumbnailOpacity = CurvedAnimation(
@@ -219,6 +219,22 @@ class _BottomOverlayContentState extends State<_BottomOverlayContent> {
         final collapsedPageScroller = mainEntry.isMotionPhoto;
 
         final availableWidth = widget.availableSize.width;
+        final noteButton = ValueListenableBuilder<bool>(
+          valueListenable: objectNoteModeNotifier,
+          builder: (context, active, child) {
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 4),
+              child: OverlayButton(
+                scale: _buttonScale,
+                child: IconButton(
+                  icon: Icon(Icons.note_add, color: active ? Theme.of(context).colorScheme.primary : null),
+                  tooltip: 'Добавить заметку',
+                  onPressed: () => objectNoteModeNotifier.value = !active,
+                ),
+              ),
+            );
+          },
+        );
         return SizedBox(
           width: availableWidth,
           child: Column(
@@ -237,6 +253,7 @@ class _BottomOverlayContentState extends State<_BottomOverlayContent> {
                     ),
                   ),
                 ),
+              noteButton,
               (showMultiPageOverlay && collapsedPageScroller)
                   ? Row(
                       crossAxisAlignment: .center,
