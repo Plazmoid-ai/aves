@@ -44,12 +44,14 @@ jobs:
           KEY_ALIAS: ${{ secrets.AVES_KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.AVES_KEY_PASSWORD }}
         run: |
+          set -euo pipefail
           test -n "$KEYSTORE_B64"
           test -n "$STORE_PASSWORD"
           test -n "$KEY_ALIAS"
           test -n "$KEY_PASSWORD"
           KEYSTORE_PATH="$RUNNER_TEMP/aves-modbox-release.jks"
-          printf '%s' "$KEYSTORE_B64" | base64 --decode > "$KEYSTORE_PATH"
+          CLEAN_B64=$(printf '%s' "$KEYSTORE_B64" | tr -d '[:space:]')
+          printf '%s' "$CLEAN_B64" | base64 --decode > "$KEYSTORE_PATH"
           test -s "$KEYSTORE_PATH"
           {
             echo "AVES_STORE_FILE=$KEYSTORE_PATH"
