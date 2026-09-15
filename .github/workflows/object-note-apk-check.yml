@@ -24,19 +24,6 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - name: Patch object note dialog context
-        run: |
-          python3 - <<'PY'
-          from pathlib import Path
-          p = Path('lib/widgets/viewer/visual/entry_page_view.dart')
-          s = p.read_text()
-          s = s.replace('if (!objectNoteModeNotifier.value) return;\n    final contentSize', 'if (!objectNoteModeNotifier.value) return;\n    if (!context.mounted) return;\n    final navigator = Navigator.of(context, rootNavigator: true);\n    final contentSize', 1)
-          s = s.replace('onSubmitted: (_) => Navigator.of(dialogContext).pop(controller.text),', 'onSubmitted: (_) => navigator.pop(controller.text),', 1)
-          s = s.replace('onPressed: () => Navigator.of(dialogContext).pop(),', 'onPressed: navigator.pop,', 1)
-          s = s.replace('onPressed: () => Navigator.of(dialogContext).pop(controller.text),', 'onPressed: () => navigator.pop(controller.text),', 1)
-          p.write_text(s)
-          PY
-
       - name: Get Flutter packages
         run: |
           ./flutterw doctor -v
@@ -50,27 +37,49 @@ jobs:
           PUB_CACHE=$HOME/.pub-cache
           sed -i -e 's/-Wl,/-Wl,--build-id=none,/' ${PUB_CACHE}/hosted/*/jni-*/src/CMakeLists.txt 2>/dev/null || true
 
+      - name: Prepare release signing
+        env:
+          KEYSTORE_B64: ${{ secrets.AVES_KEYSTORE_BASE64 }}
+          STORE_PASSWORD: ${{ secrets.AVES_STORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.AVES_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.AVES_KEY_PASSWORD }}
+        run: |
+          test -n "$KEYSTORE_B64"
+          test -n "$STORE_PASSWORD"
+          test -n "$KEY_ALIAS"
+          test -n "$KEY_PASSWORD"
+          KEYSTORE_PATH="$RUNNER_TEMP/aves-modbox-release.jks"
+          printf '%s' "$KEYSTORE_B64" | base64 --decode > "$KEYSTORE_PATH"
+          test -s "$KEYSTORE_PATH"
+          {
+            echo "AVES_STORE_FILE=$KEYSTORE_PATH"
+            echo "AVES_STORE_PASSWORD=$STORE_PASSWORD"
+            echo "AVES_KEY_ALIAS=$KEY_ALIAS"
+            echo "AVES_KEY_PASSWORD=$KEY_PASSWORD"
+          } >> "$GITHUB_ENV"
+
       - name: Build release arm64 APK
         run: |
           ./flutterw build apk -t lib/main_libre.dart --flavor libre --split-per-abi --target-platform android-arm64
 
-      - name: Commit fixed source and remove temporary workflow
+      - name: Verify APK is signed
         run: |
-          git config user.name github-actions[bot]
-          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
-          git add lib/widgets/viewer/visual/entry_page_view.dart
-          if [ -f .github/workflows/fix-object-note-dialog.yml ]; then
-            git rm .github/workflows/fix-object-note-dialog.yml
-          fi
-          if git diff --cached --quiet; then
-            echo 'No source cleanup needed'
-          else
-            git commit -m "Fix object note dialog context handling"
-            git push
-          fi
+          APK=$(find build/app/outputs/apk/libre/release -name '*arm64-v8a*.apk' -type f | grep -v -- '-unsigned.apk$' | head -n1)
+          test -n "$APK"
+          APKSIGNER=$(find "$ANDROID_HOME/build-tools" -name apksigner | sort -V | tail -n1)
+          test -n "$APKSIGNER"
+          "$APKSIGNER" verify --verbose "$APK"
+          "$APKSIGNER" verify --print-certs "$APK"
 
-      - name: Upload arm64 APK
+      - name: Upload signed arm64 APK
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: object-note-libre-arm64-release
-          path: build/app/outputs/apk/libre/release/*arm64-v8a*.apk
+          path: build/app/outputs/apk/libre/release/*arm64-v8a-release.apk
+
+      - name: Remove temporary keystore
+        if: always()
+        run: |
+          if [ -n "${AVES_STORE_FILE:-}" ]; then
+            rm -f "$AVES_STORE_FILE"
+          fi
