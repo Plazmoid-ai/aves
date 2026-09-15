@@ -61,6 +61,7 @@ class _EntryPageViewState extends State<EntryPageView> with TickerProviderStateM
   final Set<StreamSubscription> _subscriptions = {};
   final ValueNotifier<Widget?> _actionFeedbackChildNotifier = ValueNotifier(null);
   OverlayEntry? _actionFeedbackOverlayEntry;
+  List<ObjectNote> _objectNotes = const [];
 
   AvesEntry get mainEntry => widget.mainEntry;
   AvesEntry get entry => widget.pageEntry;
@@ -70,6 +71,7 @@ class _EntryPageViewState extends State<EntryPageView> with TickerProviderStateM
   void initState() {
     super.initState();
     _registerWidget(widget);
+    _loadObjectNotes();
   }
 
   @override
@@ -78,6 +80,7 @@ class _EntryPageViewState extends State<EntryPageView> with TickerProviderStateM
     if (oldWidget.pageEntry != widget.pageEntry) {
       _unregisterWidget(oldWidget);
       _registerWidget(widget);
+      _loadObjectNotes();
     }
   }
 
@@ -116,6 +119,28 @@ class _EntryPageViewState extends State<EntryPageView> with TickerProviderStateM
     _subscriptions
       ..forEach((sub) => sub.cancel())
       ..clear();
+  }
+
+  Future<void> _loadObjectNotes() async {
+    final notes = await objectNoteStore.getForEntry(entry.uri.toString());
+
+    if (!mounted) return;
+
+    setState(() {
+      _objectNotes = notes;
+    });
+
+    debugPrint(
+      '[ObjectNote MVP] loaded '
+      'entry=${entry.pageId} count=${notes.length}',
+    );
+
+    for (final note in notes) {
+      debugPrint(
+        '[ObjectNote MVP] loaded note '
+        'x=${note.x} y=${note.y} text=${note.text}',
+      );
+    }
   }
 
   @override
