@@ -51,6 +51,22 @@ jobs:
           test -n "$KEY_PASSWORD"
           KEYSTORE_PATH="$RUNNER_TEMP/aves-modbox-release.jks"
           CLEAN_B64=$(printf '%s' "$KEYSTORE_B64" | tr -d '[:space:]')
+          echo "Base64 length: ${#CLEAN_B64}"
+          echo "Base64 length mod 4: $((${#CLEAN_B64} % 4))"
+          INVALID_COUNT=$(printf '%s' "$CLEAN_B64" | LC_ALL=C tr -d 'A-Za-z0-9+/=' | wc -c)
+          echo "Invalid Base64 characters: $INVALID_COUNT"
+          python3 - <<'PY'
+          import base64
+          import os
+          s = ''.join(os.environ['KEYSTORE_B64'].split())
+          print('Python Base64 validation: starting')
+          try:
+              decoded = base64.b64decode(s, validate=True)
+              print(f'Python Base64 validation: OK, decoded bytes: {len(decoded)}')
+          except Exception as e:
+              print(f'Python Base64 validation: FAILED ({type(e).__name__}: {e})')
+              raise
+          PY
           printf '%s' "$CLEAN_B64" | base64 --decode > "$KEYSTORE_PATH"
           test -s "$KEYSTORE_PATH"
           {
@@ -77,7 +93,7 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: object-note-libre-arm64-release
-          path: build/app/outputs/apk/libre/release/*arm64-v8a-release.apk
+          path: build/app/outputs/flutter-apk/*arm64-v8a-release.apk
 
       - name: Remove temporary keystore
         if: always()
