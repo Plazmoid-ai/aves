@@ -69,3 +69,5 @@ final objectNoteStore = ObjectNoteStore();
 /// When true, a long-press in the viewer is interpreted as adding an object note.
 /// The mode is intentionally one-shot and is not persisted.
 final objectNoteModeNotifier = ValueNotifier<bool>(false);
+
+// MVP build trigger: keep object-note changes in the release verification path.
