@@ -442,7 +442,32 @@ class _EntryPageViewState extends State<EntryPageView> with TickerProviderStateM
         'created=${note.created}',
       );
     }
-  }
+
+    if (!mounted) return;
+
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('Проверка заметки'),
+          content: savedNotes.isEmpty
+              ? const Text('Заметок не найдено')
+              : Text(
+                  'Найдено заметок: ${savedNotes.length}\n\n'
+                  '${savedNotes.map((note) => '• ${note.text}\n'
+                      '  X: ${note.x.toStringAsFixed(3)}\n'
+                      '  Y: ${note.y.toStringAsFixed(3)}').join('\n\n')}',
+                ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: const Text('OK'),
+            ),
+          ],
+        );
+      },
+    );
+      }
 
   Future<void> _startGlobalDrag() async {
     const dragShadowSize = Size.square(128);
