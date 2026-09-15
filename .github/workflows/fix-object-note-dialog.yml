@@ -1,0 +1,59 @@
+name: Fix Object Note Dialog
+
+on:
+  push:
+    branches:
+      - develop
+
+permissions: contents: write
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Patch dialog context handling
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('lib/widgets/viewer/visual/entry_page_view.dart')
+          s = p.read_text()
+          old = '''  Future<void> _onLongPressStart(BuildContext context, MagnifierState state, Alignment alignment, Offset childTapPosition) async {
+    if (!objectNoteModeNotifier.value) return;
+    final contentSize = entry.displaySize;
+    if (contentSize.isEmpty) return;
+    final x = (childTapPosition.dx / contentSize.width).clamp(0.0, 1.0);
+    final y = (childTapPosition.dy / contentSize.height).clamp(0.0, 1.0);
+
+    final controller = TextEditingController();
+'''
+          new = '''  Future<void> _onLongPressStart(BuildContext context, MagnifierState state, Alignment alignment, Offset childTapPosition) async {
+    if (!objectNoteModeNotifier.value) return;
+    if (!context.mounted) return;
+    final navigator = Navigator.of(context, rootNavigator: true);
+    final contentSize = entry.displaySize;
+    if (contentSize.isEmpty) return;
+    final x = (childTapPosition.dx / contentSize.width).clamp(0.0, 1.0);
+    final y = (childTapPosition.dy / contentSize.height).clamp(0.0, 1.0);
+
+    final controller = TextEditingController();
+'''
+          if old not in s:
+              raise SystemExit('Expected object note handler header not found')
+          s = s.replace(old, new, 1)
+          s = s.replace('''          onSubmitted: (_) => Navigator.of(dialogContext).pop(controller.text),''', '''          onSubmitted: (_) => navigator.pop(controller.text),''', 1)
+          s = s.replace('''            onPressed: () => Navigator.of(dialogContext).pop(),''', '''            onPressed: navigator.pop,''', 1)
+          s = s.replace('''            onPressed: () => Navigator.of(dialogContext).pop(controller.text),''', '''            onPressed: () => navigator.pop(controller.text),''', 1)
+          p.write_text(s)
+          PY
+
+      - name: Remove temporary workflow and commit
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add lib/widgets/viewer/visual/entry_page_view.dart
+          git rm .github/workflows/fix-object-note-dialog.yml
+          git commit -m "Fix object note dialog context handling"
+          git push
