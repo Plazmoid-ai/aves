@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class ObjectNote {
@@ -64,3 +65,7 @@ class ObjectNoteStore {
 }
 
 final objectNoteStore = ObjectNoteStore();
+
+/// When true, a long-press in the viewer is interpreted as adding an object note.
+/// The mode is intentionally one-shot and is not persisted.
+final objectNoteModeNotifier = ValueNotifier<bool>(false);
