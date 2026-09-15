@@ -49,6 +49,7 @@ class const AvesMagnifier({
   final MagnifierGestureFlingCallback? onFling,
   final MagnifierTapCallback? onTap,
   final GestureLongPressCallback? onLongPress,
+  final MagnifierLongPressStartCallback? onLongPressStart,
   final MagnifierDoubleTapCallback? onDoubleTap,
   required final Widget child,
 }) extends StatefulWidget {
@@ -363,6 +364,18 @@ class _AvesMagnifierState extends State<AvesMagnifier> with TickerProviderStateM
     }
   }
 
+  void _onLongPressStart(LongPressStartDetails details) {
+    final onLongPressStart = widget.onLongPressStart;
+    if (onLongPressStart == null) return;
+
+    final viewportTapPosition = details.localPosition;
+    final alignment = _getTapAlignment(viewportTapPosition);
+    final childTapPosition = _getChildTapPosition(viewportTapPosition);
+    if (alignment != null && childTapPosition != null) {
+      onLongPressStart(context, controller.currentState, alignment, childTapPosition);
+    }
+  }
+
   bool _allowDoubleTap(Offset localPosition) {
     final allowDoubleTap = widget.allowDoubleTap;
     if (allowDoubleTap != null) {
@@ -450,6 +463,7 @@ class _AvesMagnifierState extends State<AvesMagnifier> with TickerProviderStateM
           onScaleEnd: onScaleEnd,
           onTapUp: widget.onTap == null ? null : _onTapUp,
           onLongPress: widget.onLongPress,
+          onLongPressStart: widget.onLongPressStart == null ? null : _onLongPressStart,
           onDoubleTap: _onDoubleTap,
           allowDoubleTap: _allowDoubleTap,
           child: Padding(
@@ -518,6 +532,12 @@ class const _CenterWithOriginalSizeDelegate(
 }
 
 typedef MagnifierTapCallback = Function(
+  BuildContext context,
+  MagnifierState state,
+  Alignment alignment,
+  Offset childTapPosition,
+);
+typedef MagnifierLongPressStartCallback = Function(
   BuildContext context,
   MagnifierState state,
   Alignment alignment,
