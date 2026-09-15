@@ -70,5 +70,4 @@ final objectNoteStore = ObjectNoteStore();
 /// The mode is intentionally one-shot and is not persisted.
 final objectNoteModeNotifier = ValueNotifier<bool>(false);
 
-// MVP build trigger: keep object-note changes in the release verification path.
-// The next check also validates the dialog context lifecycle.
+// MVP build trigger: release arm64 verification.
