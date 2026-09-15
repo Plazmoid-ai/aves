@@ -1,0 +1,39 @@
+name: Object Note APK Check
+
+on:
+  push:
+    branches:
+      - develop
+
+permissions: read-all
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up JDK for Android Gradle plugin
+        uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Get Flutter packages
+        run: |
+          ./flutterw doctor -v
+          ./flutterw pub get
+
+      - name: Generate app localizations
+        run: ./flutterw gen-l10n
+
+      - name: Build debug APK
+        run: |
+          ./flutterw build apk -t lib/main_libre.dart --flavor libre --split-per-abi --debug
+
+      - name: Upload APKs
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: object-note-debug-apks
+          path: build/app/outputs/apk/libre/debug/*.apk
