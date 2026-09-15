@@ -414,6 +414,7 @@ class _EntryPageViewState extends State<EntryPageView> with TickerProviderStateM
 
     final trimmed = text?.trim() ?? '';
     if (trimmed.isEmpty) return;
+
     await objectNoteStore.add(ObjectNote(
       entryKey: entry.uri.toString(),
       x: x,
@@ -421,7 +422,26 @@ class _EntryPageViewState extends State<EntryPageView> with TickerProviderStateM
       text: trimmed,
       created: DateTime.now().millisecondsSinceEpoch,
     ));
-    debugPrint('[ObjectNote MVP] saved entry=${entry.pageId} x=$x y=$y text=$trimmed');
+
+    debugPrint(
+      '[ObjectNote MVP] saved '
+      'entry=${entry.pageId} x=$x y=$y text=$trimmed',
+    );
+
+    final savedNotes = await objectNoteStore.getForEntry(entry.uri.toString());
+
+    debugPrint(
+      '[ObjectNote MVP] read-back '
+      'entry=${entry.pageId} count=${savedNotes.length}',
+    );
+
+    for (final note in savedNotes) {
+      debugPrint(
+        '[ObjectNote MVP] found '
+        'x=${note.x} y=${note.y} text=${note.text} '
+        'created=${note.created}',
+      );
+    }
   }
 
   Future<void> _startGlobalDrag() async {
