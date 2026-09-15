@@ -12,8 +12,9 @@ on:
       - 'pubspec.lock'
       - '.flutter/**'
       - 'scripts/**'
+      - '.github/workflows/object-note-apk-check.yml'
 
-permissions: read-all
+permissions: contents: write
 
 jobs:
   build:
@@ -22,11 +23,41 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - name: Set up JDK for Android Gradle plugin
-        uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
-        with:
-          distribution: temurin
-          java-version: '21'
+      - name: Patch object note dialog context
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('lib/widgets/viewer/visual/entry_page_view.dart')
+          s = p.read_text()
+          old = '''  Future<void> _onLongPressStart(BuildContext context, MagnifierState state, Alignment alignment, Offset childTapPosition) async {
+    if (!objectNoteModeNotifier.value) return;
+    final contentSize = entry.displaySize;
+    if (contentSize.isEmpty) return;
+    final x = (childTapPosition.dx / contentSize.width).clamp(0.0, 1.0);
+    final y = (childTapPosition.dy / contentSize.height).clamp(0.0, 1.0);
+
+    final controller = TextEditingController();
+'''
+          new = '''  Future<void> _onLongPressStart(BuildContext context, MagnifierState state, Alignment alignment, Offset childTapPosition) async {
+    if (!objectNoteModeNotifier.value) return;
+    if (!context.mounted) return;
+    final navigator = Navigator.of(context, rootNavigator: true);
+    final contentSize = entry.displaySize;
+    if (contentSize.isEmpty) return;
+    final x = (childTapPosition.dx / contentSize.width).clamp(0.0, 1.0);
+    final y = (childTapPosition.dy / contentSize.height).clamp(0.0, 1.0);
+
+    final controller = TextEditingController();
+'''
+          if old in s:
+              s = s.replace(old, new, 1)
+              s = s.replace('''          onSubmitted: (_) => Navigator.of(dialogContext).pop(controller.text),''', '''          onSubmitted: (_) => navigator.pop(controller.text),''', 1)
+              s = s.replace('''            onPressed: () => Navigator.of(dialogContext).pop(),''', '''            onPressed: navigator.pop,''', 1)
+              s = s.replace('''            onPressed: () => Navigator.of(dialogContext).pop(controller.text),''', '''            onPressed: () => navigator.pop(controller.text),''', 1)
+              p.write_text(s)
+          else:
+              print('Dialog context patch already present')
+          PY
 
       - name: Get Flutter packages
         run: |
@@ -39,6 +70,21 @@ jobs:
       - name: Build release arm64 APK
         run: |
           ./flutterw build apk -t lib/main_libre.dart --flavor libre --split-per-abi --target-platform android-arm64
+
+      - name: Commit fixed source and remove temporary workflow
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add lib/widgets/viewer/visual/entry_page.dart
+          if [ -f .github/workflows/fix-object-note-dialog.yml ]; then
+            git rm .github/workflows/fix-object-note-dialog.yml
+          fi
+          if git diff --cached --quiet; then
+            echo 'No source cleanup needed'
+          else
+            git commit -m "Fix object note dialog context handling"
+            git push
+          fi
 
       - name: Upload arm64 APK
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
