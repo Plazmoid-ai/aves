@@ -8,6 +8,7 @@ import 'package:aves/model/settings/settings.dart';
 import 'package:aves/model/viewer/view_state.dart';
 import 'package:aves/services/common/services.dart';
 import 'package:aves/services/media/media_session_service.dart';
+import 'package:aves/services/object_note_store.dart';
 import 'package:aves/theme/icons.dart';
 import 'package:aves/view/view.dart';
 import 'package:aves/widgets/aves_app.dart';
@@ -365,7 +366,7 @@ class _EntryPageViewState extends State<EntryPageView> with TickerProviderStateM
             if (!context.mounted) return;
             _onTap(alignment: alignment);
           },
-          onLongPress: canGestureToOtherApps ? _startGlobalDrag : null,
+          onLongPress: canGestureToOtherApps && !objectNoteModeNotifier.value ? _startGlobalDrag : null,
           onLongPressStart: _onLongPressStart,
           onDoubleTap: onDoubleTap,
           child: child!,
@@ -375,12 +376,50 @@ class _EntryPageViewState extends State<EntryPageView> with TickerProviderStateM
     );
   }
 
-  void _onLongPressStart(BuildContext context, MagnifierState state, Alignment alignment, Offset childTapPosition) {
+  Future<void> _onLongPressStart(BuildContext context, MagnifierState state, Alignment alignment, Offset childTapPosition) async {
+    if (!objectNoteModeNotifier.value) return;
     final contentSize = entry.displaySize;
     if (contentSize.isEmpty) return;
     final x = (childTapPosition.dx / contentSize.width).clamp(0.0, 1.0);
     final y = (childTapPosition.dy / contentSize.height).clamp(0.0, 1.0);
-    debugPrint('[ObjectNote MVP] entry=${entry.pageId} x=$x y=$y');
+
+    final controller = TextEditingController();
+    final text = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Добавить заметку'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          textInputAction: TextInputAction.done,
+          decoration: const InputDecoration(hintText: 'Текст заметки'),
+          onSubmitted: (_) => Navigator.of(dialogContext).pop(controller.text),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: const Text('Отмена'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(controller.text),
+            child: const Text('Сохранить'),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
+    objectNoteModeNotifier.value = false;
+
+    final trimmed = text?.trim() ?? '';
+    if (trimmed.isEmpty) return;
+    await objectNoteStore.add(ObjectNote(
+      entryKey: entry.uri.toString(),
+      x: x,
+      y: y,
+      text: trimmed,
+      created: DateTime.now().millisecondsSinceEpoch,
+    ));
+    debugPrint('[ObjectNote MVP] saved entry=${entry.pageId} x=$x y=$y text=$trimmed');
   }
 
   Future<void> _startGlobalDrag() async {
