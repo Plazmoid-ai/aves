@@ -1,0 +1,35 @@
+name: Fix object note button
+
+on:
+  push:
+    branches: [develop]
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fix button wrapper
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('lib/widgets/viewer/overlay/bottom/bottom.dart')
+          s = p.read_text()
+          s = s.replace('''          child: OverlayButton(\n                scale: _buttonScale,\n                child: IconButton(\n                  icon: Icon(Icons.note_add, color: active ? Theme.of(context).colorScheme.primary : null),\n                  tooltip: 'Добавить заметку',\n                  onPressed: () => objectNoteModeNotifier.value = !active,\n                ),\n              ),''', '''          child: IconButton(\n            icon: Icon(Icons.note_add, color: active ? Theme.of(context).colorScheme.primary : null),\n            tooltip: 'Добавить заметку',\n            onPressed: () => objectNoteModeNotifier.value = !active,\n          ),''')
+          p.write_text(s)
+          PY
+      - name: Commit fix
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add lib/widgets/viewer/overlay/bottom/bottom.dart
+          git diff --cached --quiet || git commit -m "Fix object note button widget"
+          git push
+      - name: Remove temporary workflow
+        run: |
+          git rm .github/workflows/fix-object-note-button.yml
+          git commit -m "Remove temporary object note button fix workflow"
+          git push
