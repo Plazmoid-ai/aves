@@ -16,18 +16,16 @@ jobs:
           ref: develop
           fetch-depth: 0
 
-      - name: Apply patch only to the trigger commit
+      - name: Apply patch only to trigger commit
         run: |
-          if [ "$GITHUB_SHA" != "324e481df4972eac9a233a39a19e41002471c099" ]; then
+          if [ "$(git log -1 --pretty=%s)" != "TEMP OBJECT NOTE PATCH 2" ]; then
             echo "Not the trigger commit; nothing to do."
             exit 0
           fi
           python3 - <<'PY'
           from pathlib import Path
-
           p = Path('lib/widgets/viewer/visual/entry_page_view.dart')
           s = p.read_text()
-
           old_raster = '''  Widget _buildRasterView() {
     return _buildMagnifier(
       applyScale: false,
@@ -92,12 +90,10 @@ jobs:
               raise SystemExit('Overlay already present; aborting')
           s = s.replace(old_raster, new_raster, 1)
           s = s.replace(old_svg, new_svg, 1)
-
           anchor = '  Widget _buildVideoView() {\n'
           overlay = '''  Widget _buildObjectNotesOverlay() {
     final size = entry.displaySize;
     if (size.isEmpty || _objectNotes.isEmpty) return const SizedBox.shrink();
-
     return IgnorePointer(
       child: Stack(
         children: [
@@ -133,7 +129,7 @@ jobs:
           PY
 
       - name: Commit patch and remove temporary files
-        if: github.sha == '324e481df4972eac9a233a39a19e41002471c099'
+        if: github.event.head_commit.message == 'TEMP OBJECT NOTE PATCH 2'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
