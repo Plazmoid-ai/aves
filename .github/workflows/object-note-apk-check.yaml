@@ -22,7 +22,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@3d3c42e5aac5ba805825ad76410c181273ba90b1
+        uses: actions/checkout@v4
 
       - name: Apply ObjectNote overlay fix
         run: python3 scripts/apply_objectnote_overlay_fix.py
@@ -93,7 +93,7 @@ jobs:
           "$APKSIGNER" verify --print-certs "$APK"
 
       - name: Upload signed arm64 APK
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        uses: actions/upload-artifact@v4
         with:
           name: object-note-libre-arm64-release
           path: build/app/outputs/flutter-apk/app-arm64-v8a-libre-release.apk
