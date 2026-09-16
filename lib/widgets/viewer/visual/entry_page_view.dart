@@ -167,7 +167,13 @@ class _EntryPageViewState extends State<EntryPageView> with TickerProviderStateM
       child = Stack(
         children: [
           child,
-          _buildObjectNotesViewportOverlay(),
+          ValueListenableBuilder<bool>(
+            valueListenable: objectNoteModeNotifier,
+            builder: (context, showNotes, _) {
+              if (!showNotes) return const SizedBox.shrink();
+              return _buildObjectNotesViewportOverlay();
+            },
+          ),
         ],
       );
     }
