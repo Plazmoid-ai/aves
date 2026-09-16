@@ -1,16 +1,12 @@
 name: Fix ObjectNote overlay rendering
-
-on:
+"on":
   workflow_dispatch:
-  push:
-    branches: [develop]
 
 permissions:
   contents: write
 
 jobs:
   fix:
-    if: github.event_name == 'workflow_dispatch' || github.event.head_commit.message != 'Fix ObjectNote overlay rendering'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout develop
