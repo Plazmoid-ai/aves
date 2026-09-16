@@ -181,13 +181,49 @@ class _EntryPageViewState extends State<EntryPageView> with TickerProviderStateM
     return child;
   }
 
+  Widget _buildObjectNotesOverlay() {
+    final size = entry.displaySize;
+    if (size.isEmpty || _objectNotes.isEmpty) return const SizedBox.shrink();
+
+    return IgnorePointer(
+      child: Stack(
+        children: [
+          for (final note in _objectNotes)
+            Positioned(
+              left: note.x * size.width - 14,
+              top: note.y * size.height - 14,
+              child: Container(
+                width: 28,
+                height: 28,
+                decoration: BoxDecoration(
+                  color: Colors.red,
+                  shape: BoxShape.circle,
+                  border: Border.all(color: Colors.white, width: 2),
+                ),
+                alignment: Alignment.center,
+                child: const Text(
+                  '•',
+                  style: TextStyle(color: Colors.white, fontSize: 18, height: 1),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildRasterView() {
     return _buildMagnifier(
       applyScale: false,
-      child: RasterImageView(
-        entry: entry,
-        viewStateNotifier: _viewStateNotifier,
-        errorBuilder: (context, error, stackTrace) => ErrorView(entry: entry, onTap: _onTap),
+      child: Stack(
+        children: [
+          RasterImageView(
+            entry: entry,
+            viewStateNotifier: _viewStateNotifier,
+            errorBuilder: (context, error, stackTrace) => ErrorView(entry: entry, onTap: _onTap),
+          ),
+          _buildObjectNotesOverlay(),
+        ],
       ),
     );
   }
@@ -197,10 +233,15 @@ class _EntryPageViewState extends State<EntryPageView> with TickerProviderStateM
       maxScale: EntryPageView.vectorMaxScale,
       scaleStateCycle: _vectorScaleStateCycle,
       applyScale: false,
-      child: VectorImageView(
-        entry: entry,
-        viewStateNotifier: _viewStateNotifier,
-        errorBuilder: (context, error, stackTrace) => ErrorView(entry: entry, onTap: _onTap),
+      child: Stack(
+        children: [
+          VectorImageView(
+            entry: entry,
+            viewStateNotifier: _viewStateNotifier,
+            errorBuilder: (context, error, stackTrace) => ErrorView(entry: entry, onTap: _onTap),
+          ),
+          _buildObjectNotesOverlay(),
+        ],
       ),
     );
   }
@@ -448,6 +489,8 @@ class _EntryPageViewState extends State<EntryPageView> with TickerProviderStateM
       created: DateTime.now().millisecondsSinceEpoch,
     ));
 
+    await _loadObjectNotes();
+
     debugPrint(
       '[ObjectNote MVP] saved '
       'entry=${entry.pageId} x=$x y=$y text=$trimmed',
@@ -492,7 +535,7 @@ class _EntryPageViewState extends State<EntryPageView> with TickerProviderStateM
         );
       },
     );
-      }
+  }
 
   Future<void> _startGlobalDrag() async {
     const dragShadowSize = Size.square(128);
