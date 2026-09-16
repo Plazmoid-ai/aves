@@ -24,12 +24,13 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        uses: actions/checkout@3d3c42e5aac5ba805825ad76410c181273ba90b1
 
       - name: Apply ObjectNote overlay fix
         shell: python
         run: |
           from pathlib import Path
+          import re
 
           path = Path('lib/widgets/viewer/visual/entry_page_view.dart')
           text = path.read_text()
@@ -37,11 +38,6 @@ jobs:
           if '_buildObjectNotesViewportOverlay' in text:
               print('ObjectNote overlay fix already applied')
               raise SystemExit(0)
-
-          old_overlay_start = '  Widget _buildObjectNotesOverlay() {'
-          old_overlay_end = '  Widget _buildRasterView() {'
-          start = text.index(old_overlay_start)
-          end = text.index(old_overlay_end, start)
 
           new_overlay = '''  Widget _buildObjectNotesViewportOverlay() {
             return Positioned.fill(
@@ -104,25 +100,17 @@ jobs:
           }
 
           '''
-          text = text[:start] + new_overlay + text[end:]
 
-          old_raster = '''  Widget _buildRasterView() {
-            return _buildMagnifier(
-              applyScale: false,
-              child: Stack(
-                children: [
-                  RasterImageView(
-                    entry: entry,
-                    viewStateNotifier: _viewStateNotifier,
-                    errorBuilder: (context, error, stackTrace) => ErrorView(entry: entry, onTap: _onTap),
-                  ),
-                  _buildObjectNotesOverlay(),
-                ],
-              ),
-            );
-          }
+          text, count = re.subn(
+              r'  Widget _buildObjectNotesOverlay\(\) \{.*?(?=  Widget _buildRasterView\(\) \{)',
+              lambda m: new_overlay,
+              text,
+              count=1,
+              flags=re.S,
+          )
+          if count != 1:
+              raise RuntimeError('ObjectNote overlay method not found')
 
-          '''
           new_raster = '''  Widget _buildRasterView() {
             return _buildMagnifier(
               applyScale: false,
@@ -135,29 +123,16 @@ jobs:
           }
 
           '''
-          if old_raster not in text:
-              raise RuntimeError('Expected raster ObjectNote patch not found')
-          text = text.replace(old_raster, new_raster, 1)
+          text, count = re.subn(
+              r'  Widget _buildRasterView\(\) \{.*?(?=  Widget _buildSvgView\(\) \{)',
+              lambda m: new_raster,
+              text,
+              count=1,
+              flags=re.S,
+          )
+          if count != 1:
+              raise RuntimeError('Raster view method not found')
 
-          old_svg = '''  Widget _buildSvgView() {
-            return _buildMagnifier(
-              maxScale: EntryPageView.vectorMaxScale,
-              scaleStateCycle: _vectorScaleStateCycle,
-              applyScale: false,
-              child: Stack(
-                children: [
-                  VectorImageView(
-                    entry: entry,
-                    viewStateNotifier: _viewStateNotifier,
-                    errorBuilder: (context, error, stackTrace) => ErrorView(entry: entry, onTap: _onTap),
-                  ),
-                  _buildObjectNotesOverlay(),
-                ],
-              ),
-            );
-          }
-
-          '''
           new_svg = '''  Widget _buildSvgView() {
             return _buildMagnifier(
               maxScale: EntryPageView.vectorMaxScale,
@@ -172,21 +147,27 @@ jobs:
           }
 
           '''
-          if old_svg not in text:
-              raise RuntimeError('Expected SVG ObjectNote patch not found')
-          text = text.replace(old_svg, new_svg, 1)
+          text, count = re.subn(
+              r'  Widget _buildSvgView\(\) \{.*?(?=  Widget _buildVideoView\(\) \{)',
+              lambda m: new_svg,
+              text,
+              count=1,
+              flags=re.S,
+          )
+          if count != 1:
+              raise RuntimeError('SVG view method not found')
 
-          marker = '    if (!settings.viewerUseCutout) {'
           insertion = '''    if (_objectNotes.isNotEmpty) {
-              child = Stack(
-                children: [
-                  child,
-                  _buildObjectNotesViewportOverlay(),
-                ],
-              );
-            }
+      child = Stack(
+        children: [
+          child,
+          _buildObjectNotesViewportOverlay(),
+        ],
+      );
+    }
 
-          '''
+'''
+          marker = '    if (!settings.viewerUseCutout) {'
           if marker not in text:
               raise RuntimeError('Build insertion point not found')
           text = text.replace(marker, insertion + marker, 1)
