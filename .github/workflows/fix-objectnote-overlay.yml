@@ -1,0 +1,199 @@
+name: Fix ObjectNote overlay rendering
+
+on:
+  push:
+    branches: [develop]
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    if: github.event.head_commit.message != 'Fix ObjectNote overlay rendering'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout develop
+        uses: actions/checkout@v4
+        with:
+          ref: develop
+          fetch-depth: 0
+
+      - name: Apply safe ObjectNote overlay fix
+        shell: python
+        run: |
+          from pathlib import Path
+
+          path = Path('lib/widgets/viewer/visual/entry_page_view.dart')
+          text = path.read_text()
+
+          if '_buildObjectNotesViewportOverlay' in text:
+              print('ObjectNote overlay fix already applied')
+              raise SystemExit(0)
+
+          old_overlay_start = '  Widget _buildObjectNotesOverlay() {'
+          old_overlay_end = '  Widget _buildRasterView() {'
+          start = text.index(old_overlay_start)
+          end = text.index(old_overlay_end, start)
+
+          new_overlay = '''  Widget _buildObjectNotesViewportOverlay() {
+    return Positioned.fill(
+      child: IgnorePointer(
+        child: StreamBuilder<MagnifierState>(
+          stream: _magnifierController.stateStream,
+          initialData: _magnifierController.currentState,
+          builder: (context, snapshot) {
+            final boundaries = _magnifierController.scaleBoundaries;
+            final state = snapshot.data;
+            if (boundaries == null || state == null || state.scale == null || _objectNotes.isEmpty) {
+              return const SizedBox.shrink();
+            }
+
+            final scale = state.scale!;
+            final viewportCenter = boundaries.viewportCenter;
+            final contentCenter = boundaries.contentSize.center(Offset.zero);
+            final contentSize = boundaries.contentSize;
+
+            return Stack(
+              clipBehavior: Clip.none,
+              children: [
+                for (final note in _objectNotes)
+                  Builder(
+                    builder: (context) {
+                      final contentPosition = Offset(
+                        note.x * contentSize.width,
+                        note.y * contentSize.height,
+                      );
+                      final viewportPosition = viewportCenter +
+                          state.position +
+                          (contentPosition - contentCenter) * scale;
+
+                      return Positioned(
+                        left: viewportPosition.dx - 14,
+                        top: viewportPosition.dy - 14,
+                        child: Container(
+                          width: 28,
+                          height: 28,
+                          decoration: BoxDecoration(
+                            color: Colors.red,
+                            shape: BoxShape.circle,
+                            border: Border.all(color: Colors.white, width: 2),
+                          ),
+                          alignment: Alignment.center,
+                          child: const Text(
+                            '•',
+                            style: TextStyle(color: Colors.white, fontSize: 18, height: 1),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+              ],
+            );
+          },
+        ),
+      ),
+    );
+  }
+
+'''
+          text = text[:start] + new_overlay + text[end:]
+
+          old_raster = '''  Widget _buildRasterView() {
+    return _buildMagnifier(
+      applyScale: false,
+      child: Stack(
+        children: [
+          RasterImageView(
+            entry: entry,
+            viewStateNotifier: _viewStateNotifier,
+            errorBuilder: (context, error, stackTrace) => ErrorView(entry: entry, onTap: _onTap),
+          ),
+          _buildObjectNotesOverlay(),
+        ],
+      ),
+    );
+  }
+
+'''
+          new_raster = '''  Widget _buildRasterView() {
+    return _buildMagnifier(
+      applyScale: false,
+      child: RasterImageView(
+        entry: entry,
+        viewStateNotifier: _viewStateNotifier,
+        errorBuilder: (context, error, stackTrace) => ErrorView(entry: entry, onTap: _onTap),
+      ),
+    );
+  }
+
+'''
+          if old_raster not in text:
+              raise RuntimeError('Expected raster ObjectNote patch not found')
+          text = text.replace(old_raster, new_raster, 1)
+
+          old_svg = '''  Widget _buildSvgView() {
+    return _buildMagnifier(
+      maxScale: EntryPageView.vectorMaxScale,
+      scaleStateCycle: _vectorScaleStateCycle,
+      applyScale: false,
+      child: Stack(
+        children: [
+          VectorImageView(
+            entry: entry,
+            viewStateNotifier: _viewStateNotifier,
+            errorBuilder: (context, error, stackTrace) => ErrorView(entry: entry, onTap: _onTap),
+          ),
+          _buildObjectNotesOverlay(),
+        ],
+      ),
+    );
+  }
+
+'''
+          new_svg = '''  Widget _buildSvgView() {
+    return _buildMagnifier(
+      maxScale: EntryPageView.vectorMaxScale,
+      scaleStateCycle: _vectorScaleStateCycle,
+      applyScale: false,
+      child: VectorImageView(
+        entry: entry,
+        viewStateNotifier: _viewStateNotifier,
+        errorBuilder: (context, error, stackTrace) => ErrorView(entry: entry, onTap: _onTap),
+      ),
+    );
+  }
+
+'''
+          if old_svg not in text:
+              raise RuntimeError('Expected SVG ObjectNote patch not found')
+          text = text.replace(old_svg, new_svg, 1)
+
+          marker = '''    if (!settings.viewerUseCutout) {'''
+          insertion = '''    if (_objectNotes.isNotEmpty) {
+      child = Stack(
+        children: [
+          child,
+          _buildObjectNotesViewportOverlay(),
+        ],
+      );
+    }
+
+'''
+          if marker not in text:
+              raise RuntimeError('Build insertion point not found')
+          text = text.replace(marker, insertion + marker, 1)
+
+          path.write_text(text)
+          print('ObjectNote overlay patched safely outside AvesMagnifier')
+
+      - name: Commit fix
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add lib/widgets/viewer/visual/entry_page_view.dart
+          if git diff --cached --quiet; then
+            echo 'No changes to commit'
+            exit 0
+          fi
+          git commit -m 'Fix ObjectNote overlay rendering'
+          git push origin develop
