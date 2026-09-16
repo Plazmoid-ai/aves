@@ -5,62 +5,120 @@ path = Path('lib/widgets/viewer/visual/entry_page_view.dart')
 text = path.read_text()
 
 if '_buildObjectNotesViewportOverlay' in text:
-    print('ObjectNote overlay fix already applied')
+    old_condition = 'if (boundaries == null || state == null || state.scale == null || _objectNotes.isEmpty) {'
+    new_condition = 'if (!showNotes || boundaries == null || state == null || state.scale == null || _objectNotes.isEmpty) {'
+    if old_condition in text and '!showNotes' not in text:
+        text = text.replace(old_condition, new_condition, 1)
+
+    old_stream = '''      child: StreamBuilder<MagnifierState>(
+        stream: _magnifierController.stateStream,'''
+    new_stream = '''      child: ValueListenableBuilder<bool>(
+        valueListenable: objectNoteModeNotifier,
+        builder: (context, showNotes, _) {
+          return StreamBuilder<MagnifierState>(
+            stream: _magnifierController.stateStream,'''
+    if old_stream in text and 'valueListenable: objectNoteModeNotifier' not in text:
+        text = text.replace(old_stream, new_stream, 1)
+        old_tail = '''          },
+        ),
+      ),
+    );
+  }
+'''
+        new_tail = '''            },
+          );
+        },
+      ),
+    );
+  }
+'''
+        if old_tail not in text:
+            raise RuntimeError('ObjectNote overlay closing block not found')
+        text = text.replace(old_tail, new_tail, 1)
+
+    old_build = '''    if (_objectNotes.isNotEmpty) {
+      child = Stack(
+        children: [
+          child,
+          _buildObjectNotesViewportOverlay(),
+        ],
+      );
+    }
+'''
+    new_build = '''    if (_objectNotes.isNotEmpty && objectNoteModeNotifier.value) {
+      child = Stack(
+        children: [
+          child,
+          _buildObjectNotesViewportOverlay(),
+        ],
+      );
+    }
+'''
+    if old_build in text:
+        text = text.replace(old_build, new_build, 1)
+
+    path.write_text(text)
+    print('ObjectNote visibility now follows objectNoteModeNotifier')
     raise SystemExit(0)
 
 overlay = '''  Widget _buildObjectNotesViewportOverlay() {
     return Positioned.fill(
       child: IgnorePointer(
-        child: StreamBuilder<MagnifierState>(
-          stream: _magnifierController.stateStream,
-          initialData: _magnifierController.currentState,
-          builder: (context, snapshot) {
-            final boundaries = _magnifierController.scaleBoundaries;
-            final state = snapshot.data;
-            if (boundaries == null || state == null || state.scale == null || _objectNotes.isEmpty) {
-              return const SizedBox.shrink();
-            }
+        child: ValueListenableBuilder<bool>(
+          valueListenable: objectNoteModeNotifier,
+          builder: (context, showNotes, _) {
+            return StreamBuilder<MagnifierState>(
+              stream: _magnifierController.stateStream,
+              initialData: _magnifierController.currentState,
+              builder: (context, snapshot) {
+                final boundaries = _magnifierController.scaleBoundaries;
+                final state = snapshot.data;
+                if (!showNotes || boundaries == null || state == null || state.scale == null || _objectNotes.isEmpty) {
+                  return const SizedBox.shrink();
+                }
 
-            final scale = state.scale!;
-            final viewportCenter = boundaries.viewportCenter;
-            final contentCenter = boundaries.contentSize.center(Offset.zero);
-            final contentSize = boundaries.contentSize;
+                final scale = state.scale!;
+                final viewportCenter = boundaries.viewportCenter;
+                final contentCenter = boundaries.contentSize.center(Offset.zero);
+                final contentSize = boundaries.contentSize;
 
-            return Stack(
-              clipBehavior: Clip.none,
-              children: [
-                for (final note in _objectNotes)
-                  Builder(
-                    builder: (context) {
-                      final contentPosition = Offset(
-                        note.x * contentSize.width,
-                        note.y * contentSize.height,
-                      );
-                      final viewportPosition = viewportCenter +
-                          state.position +
-                          (contentPosition - contentCenter) * scale;
+                return Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    for (final note in _objectNotes)
+                      Builder(
+                        builder: (context) {
+                          final contentPosition = Offset(
+                            note.x * contentSize.width,
+                            note.y * contentSize.height,
+                          );
+                          final viewportPosition = viewportCenter +
+                              state.position +
+                              (contentPosition - contentCenter) * scale;
 
-                      return Positioned(
-                        left: viewportPosition.dx - 14,
-                        top: viewportPosition.dy - 14,
-                        child: Container(
-                          width: 28,
-                          height: 28,
-                          decoration: BoxDecoration(
-                            color: Colors.red,
-                            shape: BoxShape.circle,
-                            border: Border.all(color: Colors.white, width: 2),
-                          ),
-                          alignment: Alignment.center,
-                          child: const Text(
-                            '•',
-                            style: TextStyle(color: Colors.white, fontSize: 18, height: 1),
-                          ),
-                        ),
-                      );
-                    },
-                  ),
-              ],
+                          return Positioned(
+                            left: viewportPosition.dx - 14,
+                            top: viewportPosition.dy - 14,
+                            child: Container(
+                              width: 28,
+                              height: 28,
+                              decoration: BoxDecoration(
+                                color: Colors.red,
+                                shape: BoxShape.circle,
+                                border: Border.all(color: Colors.white, width: 2),
+                              ),
+                              alignment: Alignment.center,
+                              child: const Text(
+                                '•',
+                                style: TextStyle(color: Colors.white, fontSize: 18, height: 1),
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                  ],
+                );
+              },
             );
           },
         ),
@@ -92,13 +150,7 @@ raster = '''  Widget _buildRasterView() {
   }
 
 '''
-text, n = re.subn(
-    r'  Widget _buildRasterView\(\) \{.*?(?=  Widget _buildSvgView\(\) \{)',
-    lambda m: raster,
-    text,
-    count=1,
-    flags=re.S,
-)
+text, n = re.subn(r'  Widget _buildRasterView\(\) \{.*?(?=  Widget _buildSvgView\(\) \{)', lambda m: raster, text, count=1, flags=re.S)
 if n != 1:
     raise RuntimeError('Raster view method not found')
 
@@ -116,18 +168,12 @@ svg = '''  Widget _buildSvgView() {
   }
 
 '''
-text, n = re.subn(
-    r'  Widget _buildSvgView\(\) \{.*?(?=  Widget _buildVideoView\(\) \{)',
-    lambda m: svg,
-    text,
-    count=1,
-    flags=re.S,
-)
+text, n = re.subn(r'  Widget _buildSvgView\(\) \{.*?(?=  Widget _buildVideoView\(\) \{)', lambda m: svg, text, count=1, flags=re.S)
 if n != 1:
     raise RuntimeError('SVG view method not found')
 
 marker = '    if (!settings.viewerUseCutout) {'
-insertion = '''    if (_objectNotes.isNotEmpty) {
+insertion = '''    if (_objectNotes.isNotEmpty && objectNoteModeNotifier.value) {
       child = Stack(
         children: [
           child,
