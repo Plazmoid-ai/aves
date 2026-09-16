@@ -163,6 +163,15 @@ class _EntryPageViewState extends State<EntryPageView> with TickerProviderStateM
       },
     );
 
+    if (_objectNotes.isNotEmpty) {
+      child = Stack(
+        children: [
+          child,
+          _buildObjectNotesViewportOverlay(),
+        ],
+      );
+    }
+
     if (!settings.viewerUseCutout) {
       child = SafeCutoutArea(child: ClipRect(child: child));
     }
@@ -181,33 +190,62 @@ class _EntryPageViewState extends State<EntryPageView> with TickerProviderStateM
     return child;
   }
 
-  Widget _buildObjectNotesOverlay() {
-    final size = entry.displaySize;
-    if (size.isEmpty || _objectNotes.isEmpty) return const SizedBox.shrink();
+  Widget _buildObjectNotesViewportOverlay() {
+    return Positioned.fill(
+      child: IgnorePointer(
+        child: StreamBuilder<MagnifierState>(
+          stream: _magnifierController.stateStream,
+          initialData: _magnifierController.currentState,
+          builder: (context, snapshot) {
+            final boundaries = _magnifierController.scaleBoundaries;
+            final state = snapshot.data;
+            if (boundaries == null || state == null || state.scale == null || _objectNotes.isEmpty) {
+              return const SizedBox.shrink();
+            }
 
-    return IgnorePointer(
-      child: Stack(
-        children: [
-          for (final note in _objectNotes)
-            Positioned(
-              left: note.x * size.width - 14,
-              top: note.y * size.height - 14,
-              child: Container(
-                width: 28,
-                height: 28,
-                decoration: BoxDecoration(
-                  color: Colors.red,
-                  shape: BoxShape.circle,
-                  border: Border.all(color: Colors.white, width: 2),
-                ),
-                alignment: Alignment.center,
-                child: const Text(
-                  '•',
-                  style: TextStyle(color: Colors.white, fontSize: 18, height: 1),
-                ),
-              ),
-            ),
-        ],
+            final scale = state.scale!;
+            final viewportCenter = boundaries.viewportCenter;
+            final contentCenter = boundaries.contentSize.center(Offset.zero);
+            final contentSize = boundaries.contentSize;
+
+            return Stack(
+              clipBehavior: Clip.none,
+              children: [
+                for (final note in _objectNotes)
+                  Builder(
+                    builder: (context) {
+                      final contentPosition = Offset(
+                        note.x * contentSize.width,
+                        note.y * contentSize.height,
+                      );
+                      final viewportPosition = viewportCenter +
+                          state.position +
+                          (contentPosition - contentCenter) * scale;
+
+                      return Positioned(
+                        left: viewportPosition.dx - 14,
+                        top: viewportPosition.dy - 14,
+                        child: Container(
+                          width: 28,
+                          height: 28,
+                          decoration: BoxDecoration(
+                            color: Colors.red,
+                            shape: BoxShape.circle,
+                            border: Border.all(color: Colors.white, width: 2),
+                          ),
+                          alignment: Alignment.center,
+                          child: const Text(
+                            '•',
+                            style: TextStyle(color: Colors.white, fontSize: 18, height: 1),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+              ],
+            );
+          },
+        ),
       ),
     );
   }
@@ -215,15 +253,10 @@ class _EntryPageViewState extends State<EntryPageView> with TickerProviderStateM
   Widget _buildRasterView() {
     return _buildMagnifier(
       applyScale: false,
-      child: Stack(
-        children: [
-          RasterImageView(
-            entry: entry,
-            viewStateNotifier: _viewStateNotifier,
-            errorBuilder: (context, error, stackTrace) => ErrorView(entry: entry, onTap: _onTap),
-          ),
-          _buildObjectNotesOverlay(),
-        ],
+      child: RasterImageView(
+        entry: entry,
+        viewStateNotifier: _viewStateNotifier,
+        errorBuilder: (context, error, stackTrace) => ErrorView(entry: entry, onTap: _onTap),
       ),
     );
   }
@@ -233,15 +266,10 @@ class _EntryPageViewState extends State<EntryPageView> with TickerProviderStateM
       maxScale: EntryPageView.vectorMaxScale,
       scaleStateCycle: _vectorScaleStateCycle,
       applyScale: false,
-      child: Stack(
-        children: [
-          VectorImageView(
-            entry: entry,
-            viewStateNotifier: _viewStateNotifier,
-            errorBuilder: (context, error, stackTrace) => ErrorView(entry: entry, onTap: _onTap),
-          ),
-          _buildObjectNotesOverlay(),
-        ],
+      child: VectorImageView(
+        entry: entry,
+        viewStateNotifier: _viewStateNotifier,
+        errorBuilder: (context, error, stackTrace) => ErrorView(entry: entry, onTap: _onTap),
       ),
     );
   }
