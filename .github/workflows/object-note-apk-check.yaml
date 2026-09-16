@@ -3,8 +3,7 @@ name: Object Note APK Check
 on:
   workflow_dispatch:
   push:
-    branches:
-      - develop
+    branches: [develop]
     paths:
       - 'lib/**'
       - 'plugins/**'
@@ -21,7 +20,6 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825ad76410c181273ba90b1
@@ -39,7 +37,7 @@ jobs:
               print('ObjectNote overlay fix already applied')
               raise SystemExit(0)
 
-          new_overlay = '''  Widget _buildObjectNotesViewportOverlay() {
+          overlay = '''  Widget _buildObjectNotesViewportOverlay() {
             return Positioned.fill(
               child: IgnorePointer(
                 child: StreamBuilder<MagnifierState>(
@@ -51,12 +49,10 @@ jobs:
                     if (boundaries == null || state == null || state.scale == null || _objectNotes.isEmpty) {
                       return const SizedBox.shrink();
                     }
-
                     final scale = state.scale!;
                     final viewportCenter = boundaries.viewportCenter;
                     final contentCenter = boundaries.contentSize.center(Offset.zero);
                     final contentSize = boundaries.contentSize;
-
                     return Stack(
                       clipBehavior: Clip.none,
                       children: [
@@ -70,7 +66,6 @@ jobs:
                               final viewportPosition = viewportCenter +
                                   state.position +
                                   (contentPosition - contentCenter) * scale;
-
                               return Positioned(
                                 left: viewportPosition.dx - 14,
                                 top: viewportPosition.dy - 14,
@@ -101,17 +96,17 @@ jobs:
 
           '''
 
-          text, count = re.subn(
+          text, n = re.subn(
               r'  Widget _buildObjectNotesOverlay\(\) \{.*?(?=  Widget _buildRasterView\(\) \{)',
-              lambda m: new_overlay,
+              lambda m: overlay,
               text,
               count=1,
               flags=re.S,
           )
-          if count != 1:
+          if n != 1:
               raise RuntimeError('ObjectNote overlay method not found')
 
-          new_raster = '''  Widget _buildRasterView() {
+          raster = '''  Widget _buildRasterView() {
             return _buildMagnifier(
               applyScale: false,
               child: RasterImageView(
@@ -123,17 +118,17 @@ jobs:
           }
 
           '''
-          text, count = re.subn(
+          text, n = re.subn(
               r'  Widget _buildRasterView\(\) \{.*?(?=  Widget _buildSvgView\(\) \{)',
-              lambda m: new_raster,
+              lambda m: raster,
               text,
               count=1,
               flags=re.S,
           )
-          if count != 1:
+          if n != 1:
               raise RuntimeError('Raster view method not found')
 
-          new_svg = '''  Widget _buildSvgView() {
+          svg = '''  Widget _buildSvgView() {
             return _buildMagnifier(
               maxScale: EntryPageView.vectorMaxScale,
               scaleStateCycle: _vectorScaleStateCycle,
@@ -147,16 +142,17 @@ jobs:
           }
 
           '''
-          text, count = re.subn(
+          text, n = re.subn(
               r'  Widget _buildSvgView\(\) \{.*?(?=  Widget _buildVideoView\(\) \{)',
-              lambda m: new_svg,
+              lambda m: svg,
               text,
               count=1,
               flags=re.S,
           )
-          if count != 1:
+          if n != 1:
               raise RuntimeError('SVG view method not found')
 
+          marker = '    if (!settings.viewerUseCutout) {'
           insertion = '''    if (_objectNotes.isNotEmpty) {
       child = Stack(
         children: [
@@ -167,11 +163,9 @@ jobs:
     }
 
 '''
-          marker = '    if (!settings.viewerUseCutout) {'
           if marker not in text:
               raise RuntimeError('Build insertion point not found')
           text = text.replace(marker, insertion + marker, 1)
-
           path.write_text(text)
           print('ObjectNote overlay patched outside AvesMagnifier')
 
