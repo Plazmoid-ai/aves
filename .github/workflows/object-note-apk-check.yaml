@@ -27,173 +27,11 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
 
       - name: Apply ObjectNote overlay fix
-        run: |
-          python3 - <<'PY'
-          from pathlib import Path
-
-          path = Path('lib/widgets/viewer/visual/entry_page_view.dart')
-          text = path.read_text()
-
-          if '_buildObjectNotesViewportOverlay' in text:
-              print('ObjectNote overlay fix already applied')
-              raise SystemExit(0)
-
-          old_overlay_start = '  Widget _buildObjectNotesOverlay() {'
-          old_overlay_end = '  Widget _buildRasterView() {'
-          start = text.index(old_overlay_start)
-          end = text.index(old_overlay_end, start)
-
-          new_overlay = '''  Widget _buildObjectNotesViewportOverlay() {
-    return Positioned.fill(
-      child: IgnorePointer(
-        child: StreamBuilder<MagnifierState>(
-          stream: _magnifierController.stateStream,
-          initialData: _magnifierController.currentState,
-          builder: (context, snapshot) {
-            final boundaries = _magnifierController.scaleBoundaries;
-            final state = snapshot.data;
-            if (boundaries == null || state == null || state.scale == null || _objectNotes.isEmpty) {
-              return const SizedBox.shrink();
-            }
-
-            final scale = state.scale!;
-            final viewportCenter = boundaries.viewportCenter;
-            final contentCenter = boundaries.contentSize.center(Offset.zero);
-            final contentSize = boundaries.contentSize;
-
-            return Stack(
-              clipBehavior: Clip.none,
-              children: [
-                for (final note in _objectNotes)
-                  Builder(
-                    builder: (context) {
-                      final contentPosition = Offset(
-                        note.x * contentSize.width,
-                        note.y * contentSize.height,
-                      );
-                      final viewportPosition = viewportCenter +
-                          state.position +
-                          (contentPosition - contentCenter) * scale;
-
-                      return Positioned(
-                        left: viewportPosition.dx - 14,
-                        top: viewportPosition.dy - 14,
-                        child: Container(
-                          width: 28,
-                          height: 28,
-                          decoration: BoxDecoration(
-                            color: Colors.red,
-                            shape: BoxShape.circle,
-                            border: Border.all(color: Colors.white, width: 2),
-                          ),
-                          alignment: Alignment.center,
-                          child: const Text(
-                            '•',
-                            style: TextStyle(color: Colors.white, fontSize: 18, height: 1),
-                          ),
-                        ),
-                      );
-                    },
-                  ),
-              ],
-            );
-          },
-        ),
-      ),
-    );
-  }
-
-'''
-          text = text[:start] + new_overlay + text[end:]
-
-          old_raster = '''  Widget _buildRasterView() {
-    return _buildMagnifier(
-      applyScale: false,
-      child: Stack(
-        children: [
-          RasterImageView(
-            entry: entry,
-            viewStateNotifier: _viewStateNotifier,
-            errorBuilder: (context, error, stackTrace) => ErrorView(entry: entry, onTap: _onTap),
-          ),
-          _buildObjectNotesOverlay(),
-        ],
-      ),
-    );
-  }
-
-'''
-          new_raster = '''  Widget _buildRasterView() {
-    return _buildMagnifier(
-      applyScale: false,
-      child: RasterImageView(
-        entry: entry,
-        viewStateNotifier: _viewStateNotifier,
-        errorBuilder: (context, error, stackTrace) => ErrorView(entry: entry, onTap: _onTap),
-      ),
-    );
-  }
-
-'''
-          if old_raster not in text:
-              raise RuntimeError('Expected raster ObjectNote patch not found')
-          text = text.replace(old_raster, new_raster, 1)
-
-          old_svg = '''  Widget _buildSvgView() {
-    return _buildMagnifier(
-      maxScale: EntryPageView.vectorMaxScale,
-      scaleStateCycle: _vectorScaleStateCycle,
-      applyScale: false,
-      child: Stack(
-        children: [
-          VectorImageView(
-            entry: entry,
-            viewStateNotifier: _viewStateNotifier,
-            errorBuilder: (context, error, stackTrace) => ErrorView(entry: entry, onTap: _onTap),
-          ),
-          _buildObjectNotesOverlay(),
-        ],
-      ),
-    );
-  }
-
-'''
-          new_svg = '''  Widget _buildSvgView() {
-    return _buildMagnifier(
-      maxScale: EntryPageView.vectorMaxScale,
-      scaleStateCycle: _vectorScaleStateCycle,
-      applyScale: false,
-      child: VectorImageView(
-        entry: entry,
-        viewStateNotifier: _viewStateNotifier,
-        errorBuilder: (context, error, stackTrace) => ErrorView(entry: entry, onTap: _onTap),
-      ),
-    );
-  }
-
-'''
-          if old_svg not in text:
-              raise RuntimeError('Expected SVG ObjectNote patch not found')
-          text = text.replace(old_svg, new_svg, 1)
-
-          marker = '    if (!settings.viewerUseCutout) {'
-          insertion = '''    if (_objectNotes.isNotEmpty) {
-      child = Stack(
-        children: [
-          child,
-          _buildObjectNotesViewportOverlay(),
-        ],
-      );
-    }
-
-'''
-          if marker not in text:
-              raise RuntimeError('Build insertion point not found')
-          text = text.replace(marker, insertion + marker, 1)
-
-          path.write_text(text)
-          print('ObjectNote overlay patched outside AvesMagnifier')
-          PY
+        shell: bash
+        env:
+          PATCH_B64: ZnJvbSBwYXRobGliIGltcG9ydCBQYXRoCgpwYXRoID0gUGF0aCgnbGliL3dpZGdldHMvdmlld2VyL3Zpc3VhbC9lbnRyeV9wYWdlX3ZpZXcuZGFydCcpCnRleHQgPSBwYXRoLnJlYWRfdGV4dCgpCgppZiAnX2J1aWxkT2JqZWN0Tm90ZXNWaWV3cG9ydE92ZXJsYXknIGluIHRleHQ6CiAgICBwcmludCgnT2JqZWN0Tm90ZSBvdmVybGF5IGZpeCBhbHJlYWR5IGFwcGxpZWQnKQogICAgcmFpc2UgU3lzdGVtRXhpdCgwKQoKb2xkX292ZXJsYXlfc3RhcnQgPSAnICBXaWRnZXQgX2J1aWxkT2JqZWN0Tm90ZXNPdmVybGF5KCkgeycKb2xkX292ZXJsYXlfZW5kID0gJyAgV2lkZ2V0IF9idWlsZFJhc3RlclZpZXcoKSB7JwpzdGFydCA9IHRleHQuaW5kZXgob2xkX292ZXJsYXlfc3RhcnQpCmVuZCA9IHRleHQuaW5kZXgob2xkX292ZXJsYXlfZW5kLCBzdGFydCkKCm5ld19vdmVybGF5ID0gJycnICBXaWRnZXQgX2J1aWxkT2JqZWN0Tm90ZXNWaWV3cG9ydE92ZXJsYXkoKSB7CiAgICByZXR1cm4gUG9zaXRpb25lZC5maWxsKAogICAgICBjaGlsZDogSWdub3JlUG9pbnRlcigKICAgICAgICBjaGlsZDogU3RyZWFtQnVpbGRlcjxNYWduaWZpZXJTdGF0ZT4oCiAgICAgICAgICBzdHJlYW06IF9tYWduaWZpZXJDb250cm9sbGVyLnN0YXRlU3RyZWFtLAogICAgICAgICAgIGluaXRpYWxEYXRhOiBfbWFnbmlmaWVyQ29udHJvbGxlci5jdXJyZW50U3RhdGUsCiAgICAgICAgICBidWlsZGVyOiAoY29udGV4dCwgc25hcHNob3QpIHsKICAgICAgICAgICAgZmluYWwgYm91bmRhcmllcyA9IF9tYWduaWZpZXJDb250cm9sbGVyLnNjYWxlQm91bmRhcmllczsKICAgICAgICAgICAgZmluYWwgc3RhdGUgPSBzbmFwc2hvdC5kYXRhOwogICAgICAgICAgICBpZiAoYm91bmRhcmllcyA9PSBudWxsIHx8IHN0YXRlID09IG51bGwgfHwgc3RhdGUuc2NhbGUgPT0gbnVsbCB8fCBfb2JqZWN0Tm90ZXMu aXNDbXB0eSApIHsKICAgICAgICAgICAgICByZXR1cm4gY29uc3QgU2l6ZWRCb3guc2hyaW5rKCk7CiAgICAgICAgICAgIH0KCiAgICAgICAgICAgIGZpbmFsIHNjYWxlID0gc3RhdGUuc2NhbGUhOwogICAgICAgICAgICBmaW5hbCB2aWV3cG9ydENlbnRlciA9IGJvdW5kYXJpZXMudmlld3BvcnRDb250ZXI7CiAgICAgICAgICAgIGZpbmFsIGNvbnRlbnRDZW50ZXIgPSBib3VuZGFyaWVzLmNvbnRlbnRTaXplLmNlbnRlcihPZmZzZXQuemVybyk7CiAgICAgICAgICAgIGZpbmFsIGNvbnRlbnRTaXplID0gYm91bmRhcmllcy5jb250ZW50U2l6ZTsKCiAgICAgICAgICAgIHJldHVybiBTdGFjaygKICAgICAgICAgICAgICBjbGlwQmVoYXZpb3I6IENsaXAu bm9uZSwKICAgICAgICAgICAgICBjaGlsZHJlbjogWwogICAgICAgICAgICAgICAgZm9yIChmaW5hbCBub3RlIGluIF9vYmplY3ROb3RlcykKICAgICAgICAgICAgICAgICAgQnVpbGRlcigKICAgICAgICAgICAgICAgICAgICBidWlsZGVyOiAoY29udGV4dCwge30pIHsKICAgICAgICAgICAgICAgICAgICAgIGZpbmFsIGNvbnRlbnRQb3NpdGlvbiA9IE9mZnNldCgKICAgICAgICAgICAgICAgICAgICAgICAgbm90ZS54ICogY29udGVudFNpemUud2lkdGgsCiAgICAgICAgICAgICAgICAgICAgICAgIG5vdGUueSAqIGNvbnRlbnRTaXplLmhlaWdodCwKICAgICAgICAgICAgICAgICAgICAgICk7CiAgICAgICAgICAgICAgICAgICAgIGZpbmFsIHZpZXdwb3J0UG9zaXRpb24gPSB2aWV3cG9ydENlbnRlciArCiAgICAgICAgICAgICAgICAgICAgICAgIHN0YXRlLnBvc2l0aW9uICsKICAgICAgICAgICAgICAgICAgICAgIChjb250ZW50UG9zaXRpb24gLSBjb250ZW50Q2VudGVyKSAqIHNjYWxlOwogICAgICAgICAgICAgICAgICAgIHJldHVybiBQb3NpdGlvbmVkKAogICAgICAgICAgICAgICAgICAgICAgbGVmdDogdmlld3BvcnRQb3NpdGlvbi5keCAtIDE0LAogICAgICAgICAgICAgICAgICAgICAgIHRvcDogdmlld3BvcnRQb3NpdGlvbi5keSAtIDE0LAogICAgICAgICAgICAgICAgICAgICAgIGNoaWxkOiBDb250YWluZXIoCiAgICAgICAgICAgICAgICAgICAgICAgICAgd2lkdGg6IDI4LAogICAgICAgICAgICAgICAgICAgICAgICAgIGhlaWdodDogMjgsCiAgICAgICAgICAgICAgICAgICAgICAgICAgIGRlY29yYXRpb246IEJveERlY29yYXRpb24oCiAgICAgICAgICAgICAgICAgICAgICAgICAgICBjb2xvcjogQ29sb3JzLnJlZCwKICAgICAgICAgICAgICAgICAgICAgICAgICAgIHNoYXBlOiBCb3hTaGFwZS5jaXJjbGUsCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIGJvcmRlcjogQm9yZGVyLmFsbChjb2xvcjogQ29sb3JzLndoaXRlLCB3aWR0aDogMiksCiAgICAgICAgICAgICAgICAgICAgICAgICAgKSwKICAgICAgICAgICAgICAgICAgICAgICAgYWxpZ25tZW50OiBBbGlnbm1lbnQuY2VudGVyLAogICAgICAgICAgICAgICAgICAgICAgICAgIGNoaWxkOiBjb25zdCBUZXh0KAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAn4oC+JywKICAgICAgICAgICAgICAgICAgICAgICAgICAgIHN0eWxlOiBUZXh0U3R5bGUoY29sb3I6IENvbG9ycy53aGl0ZSwgZm9udFNpemU6IDE4LCBoZWlnaHQ6IDEpLAogICAgICAgICAgICAgICAgICAgICAgICAgICk7CiAgICAgICAgICAgICAgICAgICAgICAgICAgICksCiAgICAgICAgICAgICAgICAgICAgICAgICAgKTsKICAgICAgICAgICAgICAgICAgICAgICAgfSwKICAgICAgICAgICAgICAgICAgICAgICAgKSwKICAgICAgICAgICAgICAgICAgICAgIF0sCiAgICAgICAgICAgICAgICAgICAgICk7CiAgICAgICAgICAgICAgICAgIH0sCiAgICAgICAgICAgICAgICApLAogICAgICAgICAgICAgICk7CiAgICAgICAgICAgICB9LAogICAgICAgICAgKSwKICAgICAgICAgICk7CiAgICAgICAgICB9LAogICAgICAgICksCiAgICAgICAgKSwKICAgICAgKSwKICAgICk7CiAgfQoKdGV4dCA9IHRleHRbOnN0YXJ0XSArIG5ld19vdmVybGF5ICsgdGV4dFtlbmQ6XQoKb2xkX3Jhc3RlciA9ICcnJyAgV2lkZ2V0IF9idWlsZFJhc3RlclZpZXcoKSB7CiAgICByZXR1cm4gX2J1aWxkTWFnbmlmaWVyKAogICAgICBhcHBseVNjYWxlOiBmYWxzZSwKICAgICAgY2hpbGQ6IFN0YWNrKAogICAgICAgIGNoaWxkcmVuOiBbCiAgICAgICAgICBSYXN0ZXJJbWFnZVZpZXcoCiAgICAgICAgICAgIGVudHJ5OiBlbnRyeSwKICAgICAgICAgICAgdmlld1N0YXRlTm90aWZpZXI6IF92aWV3U3RhdGVOb3RpZmllciwKICAgICAgICAgICAgZXJyb3JCdWlsZGVyOiAoY29udGV4dCwgZXJyb3IsIHN0YWNrVHJhY2UpID0+IEVycm9yVmlldyhlbnRyeTogZW50cnksIG9uVGFwOiBfb25UYXApLAogICAgICAgICAgKSwKICAgICAgICAgIF9idWlsZE9iamVjdE5vdGVzT3ZlcmxheSgpLAogICAgICAgIF0sCiAgICAgICk7CiAgICApOwogIH0KCnBhdGggPSBQYXRoKCds').replace(' ','')
+          printf '%s' "$PATCH_B64" | base64 --decode > "$RUNNER_TEMP/objectnote_patch.py"
+          python3 "$RUNNER_TEMP/objectnote_patch.py"
 
       - name: Get Flutter packages
         run: |
@@ -206,7 +44,7 @@ jobs:
       - name: Remove build ID from native lib
         run: |
           PUB_CACHE=$HOME/.pub-cache
-          sed -i -e 's/-Wl,/-Wl,--build-id=none,/' ${PUB_CACHE}/hosted/*/jni-*/src/CMakeLists.txt 2>/dev/null || true
+          sed -i -e 's/-Wl,/-Wl,--build-id=none,/' $PUB_CACHE/hosted/*/jni-*/src/CMakeLists.txt 2>/dev/null || true
 
       - name: Prepare release signing
         env:
@@ -220,14 +58,12 @@ jobs:
           test -n "$STORE_PASSWORD"
           test -n "$KEY_ALIAS"
           test -n "$KEY_PASSWORD"
-
           KEYSTORE_PATH="$RUNNER_TEMP/aves-modbox-release.jks"
           CLEAN_B64=$(printf '%s' "$KEYSTORE_B64" | tr -d '[:space:]')
           echo "Base64 length: ${#CLEAN_B64}"
           echo "Base64 length mod 4: $((${#CLEAN_B64} % 4))"
           INVALID_COUNT=$(printf '%s' "$CLEAN_B64" | LC_ALL=C tr -d 'A-Za-z0-9+/=' | wc -c)
           echo "Invalid Base64 characters: $INVALID_COUNT"
-
           KEYSTORE_B64="$KEYSTORE_B64" python3 - <<'PY'
           import base64
           import os
@@ -235,7 +71,6 @@ jobs:
           decoded = base64.b64decode(s, validate=True)
           print(f'Python Base64 validation: OK, decoded bytes: {len(decoded)}')
           PY
-
           printf '%s' "$CLEAN_B64" | base64 --decode > "$KEYSTORE_PATH"
           test -s "$KEYSTORE_PATH"
           {
