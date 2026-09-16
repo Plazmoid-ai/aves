@@ -1,1 +1,1 @@
-temporary trigger; this file will be removed by the patch workflow
+temporary trigger
