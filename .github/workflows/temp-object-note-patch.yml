@@ -9,7 +9,6 @@ permissions:
 
 jobs:
   patch:
-    if: github.event.head_commit.message == 'TEMP OBJECT NOTE PATCH'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -17,8 +16,12 @@ jobs:
           ref: develop
           fetch-depth: 0
 
-      - name: Apply ObjectNote overlay patch
+      - name: Apply patch only to the trigger commit
         run: |
+          if [ "$GITHUB_SHA" != "324e481df4972eac9a233a39a19e41002471c099" ]; then
+            echo "Not the trigger commit; nothing to do."
+            exit 0
+          fi
           python3 - <<'PY'
           from pathlib import Path
 
@@ -52,7 +55,6 @@ jobs:
     );
   }
 '''
-
           old_svg = '''  Widget _buildSvgView() {
     return _buildMagnifier(
       maxScale: EntryPageView.vectorMaxScale,
@@ -84,18 +86,14 @@ jobs:
     );
   }
 '''
-
-          if old_raster not in s:
-              raise SystemExit('Raster block not found; aborting without changes')
-          if old_svg not in s:
-              raise SystemExit('SVG block not found; aborting without changes')
+          if old_raster not in s or old_svg not in s:
+              raise SystemExit('Expected viewer blocks were not found; aborting')
           if 'Widget _buildObjectNotesOverlay()' in s:
-              raise SystemExit('ObjectNote overlay already present; aborting')
-
+              raise SystemExit('Overlay already present; aborting')
           s = s.replace(old_raster, new_raster, 1)
           s = s.replace(old_svg, new_svg, 1)
 
-          anchor = '''  Widget _buildVideoView() {\n'''
+          anchor = '  Widget _buildVideoView() {\n'
           overlay = '''  Widget _buildObjectNotesOverlay() {
     final size = entry.displaySize;
     if (size.isEmpty || _objectNotes.isEmpty) return const SizedBox.shrink();
@@ -129,17 +127,17 @@ jobs:
 
 '''
           if anchor not in s:
-              raise SystemExit('Video anchor not found; aborting without changes')
+              raise SystemExit('Video anchor not found; aborting')
           s = s.replace(anchor, overlay + anchor, 1)
-
           p.write_text(s)
           PY
 
-      - name: Commit patch and remove temporary workflow
+      - name: Commit patch and remove temporary files
+        if: github.sha == '324e481df4972eac9a233a39a19e41002471c099'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          rm -f .github/workflows/temp-object-note-patch.yml
-          git add lib/widgets/viewer/visual/entry_page_view.dart .github/workflows/temp-object-note-patch.yml
+          rm -f .github/workflows/temp-object-note-patch.yml .github/object-note-patch-trigger.txt
+          git add -A
           git commit -m "Add ObjectNote markers to viewer"
           git push origin HEAD:develop
